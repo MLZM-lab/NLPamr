@@ -1,13 +1,7 @@
 from Bio import Entrez
 from urllib.error import HTTPError
-
 import xml.etree.ElementTree as et
-import pickle
-
-import numpy as np
-import pandas as pd
-import sys 
-
+import sys
 
 """
 #############Entrez part
