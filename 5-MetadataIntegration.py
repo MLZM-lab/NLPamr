@@ -73,8 +73,8 @@ def FishCountriesFromNormSeriesSummaries(df):
 
 
 
-OUT_FILE_1_PREFIX = sys.argv[1] # "MetadataMatrix_allFeatures_fishedWHOCountriesOnly_50rowsCols"
-OUT_FILE_2_PREFIX = sys.argv[2] # "MetadataMatrix_onlyWHOandWBE_50rowsCols"
+OUT_FILE_1_PREFIX = sys.argv[1]
+OUT_FILE_2_PREFIX = sys.argv[2]
 
 
 
