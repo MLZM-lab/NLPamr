@@ -1,0 +1,252 @@
+import sys
+
+import numpy as np
+import pandas as pd
+import pickle
+
+import spacy
+from pyspark.sql import SparkSession
+from pyspark.ml.feature import Tokenizer
+from pyspark.ml.feature import StopWordsRemover
+
+from geotext import GeoText
+import pycountry_convert as pc
+
+
+"""
+###########################################################################
+###########################################################################
+######################## Functions ########################################
+"""
+
+"""
+#############NLP section
+"""
+
+"""
+Extract sentences from long abstract text
+"""
+
+def extract_sentence(text):
+    """
+    :param text 
+    :return: list of sentences
+    """
+    nlp = spacy.load("en")
+    nlp_object=nlp(text)
+    return(list(map(lambda x: str(x),list(nlp_object.sents))))
+
+
+
+"""
+Create spark dataframe to tokenize with spark
+"""
+
+def index_sentence(sentencesList_fromAbstract):
+    return list(zip(np.arange(len(sentencesList_fromAbstract)), sentencesList_fromAbstract))
+
+
+
+def create_spark_data_frame(index_sentence_list_entry):
+    return spark.createDataFrame([(float(tup[0]), tup[1]) for tup in index_sentence_list_entry], ["id", "sentence"])
+
+
+
+def tokenizer_spark(sentenceDataFrame_entry):
+    tokenizer = Tokenizer(inputCol="sentence", outputCol="words")
+    return tokenizer.transform(sentenceDataFrame_entry).select("words")
+
+
+
+"""
+Remove stop words
+"""
+
+def remover_stop_word_spark(TokenizedSentenceDataFrame_entry):
+    remover = StopWordsRemover(inputCol="words", outputCol="filtered")
+    return remover.transform(TokenizedSentenceDataFrame_entry).select("filtered")
+
+
+"""
+Extract the countries from a sentence
+"""
+
+def extract_cities_countries(sentence):
+    places = GeoText(sentence)
+    output=[]
+    output.append(np.unique(np.squeeze(places.cities)).tolist())
+    output.append(np.unique(np.squeeze(places.countries)).tolist())
+    return(output)
+
+
+"""
+Extract the continents from the countries
+"""
+
+def country_to_continent(countries_list_entry):
+    continents=[]
+    for i in countries_list_entry:
+        flat_list = [item for sublist in i for item in sublist]
+        try:
+            for country in flat_list:
+                country_code = pc.country_name_to_country_alpha2(country, cn_name_format="default")
+                continents.append(pc.country_alpha2_to_continent_code(country_code))
+        except:
+            continents.append('Not found')
+    return(continents)
+
+
+def walk(Array):  #To flatten the lists of lists of lists...
+    RESULT = []
+    if isinstance(Array, float):
+        return RESULT
+    else:
+        for obj in Array:
+            if not isinstance(obj, str):
+                for item in obj:
+                    RESULT.append(item)
+            else:
+                RESULT.append(obj)
+        return RESULT
+
+"""
+###########################################################################
+###########################################################################
+######################## Main code ########################################
+"""
+
+#Define static variables
+IN_FILE = sys.argv[1]
+DEMONYMS_FILE_PATH = sys.argv[2]
+#Demonyms from https://github.com/knowitall/chunkedextractor/blob/master/src/main/resources/edu/knowitall/chunkedextractor/demonyms.csv
+OUTPUTS_PREFIX = sys.argv[3]
+
+
+#Read input file
+df = pd.read_pickle(IN_FILE)
+
+
+"""
+Convert demonyms to country/city
+"""
+
+TitleAbstract = pd.concat([df.Title + " " + df.Abstract], axis=1)
+TitleAbstract.columns = ["TitleAbstract"]
+
+DEMONYMS = pd.read_csv(DEMONYMS_FILE_PATH, sep='\t')
+
+#First, tranform all demonyms into the origin place name in the title and in the abstract
+for index, sentence in enumerate(TitleAbstract.TitleAbstract):
+    for demonym, origin in zip(DEMONYMS.Demonym, DEMONYMS.Origin):
+        redata = re.compile(re.escape(demonym), re.IGNORECASE)        
+        TitleAbstract.TitleAbstract.iloc[index] = redata.sub(origin, sentence)
+    if index%250 == 0:
+        print(index)
+
+
+pickle.dump( TitleAbstract, open("TitleAbstract.p", "wb") )
+
+
+"""
+Extract sentences from long abstract text
+"""
+
+sentence_list=[]
+for abstract in TitleAbstract:
+    try:
+        sentence_list.append(extract_sentence(abstract))
+    except (AttributeError, TypeError):
+        sentence_list.append(abstract)
+
+
+pickle.dump( sentence_list, open(OUTPUTS_PREFIX+"_sentence_list.p", "wb") )
+
+
+"""
+Create spark dataframe to tokenize with spark
+"""
+
+index_sentence_list = []
+for i in np.arange(len(sentence_list)):
+    try:
+        index_sentence_list.append(index_sentence(sentence_list[i]))
+    except (AttributeError, TypeError, ValueError):
+        index_sentence_list.append(sentence_list[i])
+
+
+# Create spark
+spark = SparkSession.builder.getOrCreate()
+
+sentenceDataFrame = []
+for i in np.arange(len(index_sentence_list)):
+    try:
+        sentenceDataFrame.append(create_spark_data_frame(index_sentence_list[i]))
+    except (AttributeError, TypeError, ValueError):
+        sentenceDataFrame.append(index_sentence_list[i])
+
+
+TokenizedSentenceDataFrame = []
+for i in np.arange(len(sentenceDataFrame)):
+    try:
+        TokenizedSentenceDataFrame.append(tokenizer_spark(sentenceDataFrame[i]))
+    except (AttributeError, TypeError, ValueError):
+        TokenizedSentenceDataFrame.append(sentenceDataFrame[i])
+
+
+"""
+Remove stop words
+"""
+
+TokenizedSentenceNoStopWords = []
+for i in np.arange(len(TokenizedSentenceDataFrame)):
+    try:
+        TokenizedSentenceNoStopWords.append(remover_stop_word_spark(TokenizedSentenceDataFrame[i]))
+    except (AttributeError, TypeError, ValueError):
+        TokenizedSentenceNoStopWords.append(TokenizedSentenceDataFrame[i])
+
+
+"""
+Return the tokenized extracted sequences without stop words into a pd df
+"""
+
+listOfDf_TokenizedSentenceNoStopWords = []
+for i in np.arange(len(TokenizedSentenceNoStopWords)):
+    try:
+        listOfDf_TokenizedSentenceNoStopWords.append(TokenizedSentenceNoStopWords[i].toPandas())
+    except (AttributeError, TypeError, ValueError):
+        listOfDf_TokenizedSentenceNoStopWords.append(TokenizedSentenceNoStopWords[i])
+
+
+pickle.dump( listOfDf_TokenizedSentenceNoStopWords, open(OUTPUTS_PREFIX+"_listOfDf_TokenizedSentenceNoStopWords.p", "wb") )
+
+
+
+
+"""
+Extract the countries from a sentence   
+"""
+
+countries_list = []
+for i in np.arange(len(sentence_list)):
+    try:
+        countries_list.append(list(map(extract_cities_countries, sentence_list[i])))
+    except (AttributeError, TypeError, ValueError):
+        countries_list.append(sentence_list[i])
+
+
+pickle.dump( countries_list, open(OUTPUTS_PREFIX+"_countries_list.p", "wb") )
+
+
+"""
+Extract the continents from the countries
+"""
+
+continents_list = []
+for i in np.arange(len(countries_list)):
+    try:
+        continents_list.append(country_to_continent(countries_list[i]))
+    except (AttributeError, TypeError, ValueError):
+        continents_list.append(countries_list[i])
+
+
+pickle.dump( continents_list, open(OUTPUTS_PREFIX+"_continents_list.p", "wb") )
