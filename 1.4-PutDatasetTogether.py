@@ -5,12 +5,7 @@ import pickle
 import pandas as pd
 import re
 import numpy as np
-
 import spacy
-import nltk
-nltk.download('punkt')
-from nltk.stem.snowball import SnowballStemmer
-
 
 
 """###############################"""
@@ -73,18 +68,6 @@ def extend_df(df, txt, ToSubsetDrop):
     return df
 
     
-
-################################
-###Stemming
-################################
-
-
-def stemming(doc, stemmer):
-    doc = nltk.word_tokenize(doc)
-    txt = [stemmer.stem(token) for token in doc]  #stems
-    if len(txt) > 2:
-        return ' '.join(txt)
-
 
     
 """###############################"""
@@ -189,30 +172,4 @@ df = extend_df(df, txt, 'Lemmatized')
 
 ##Save it
 pickle.dump( df, open("ALLBatches_noNaN_joinedTitleAbstract_Lemma.p", "wb") )
-
-
-#Stem
-txt = [stemming(doc, stemmer) for doc in df.Lemmatized]   #See that the stemming is done upon the lemmatized tokens
-df = extend_df(df, txt, 'Stemmed')
-
-##Save it
-pickle.dump( df, open("ALLBatches_noNaN_LemmaStem.p", "wb") )  
-
-#Also save it as csv
-FILE="ALLBatches_noNaN_LemmaStem.p"
-df = pd.read_pickle(FILE)
-df.to_csv("ALLBatches_noNaN_LemmaStem.csv") 
-
-
-
-
-
-
-
-
-
-
-
-
-
 
