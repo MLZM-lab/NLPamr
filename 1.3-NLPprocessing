@@ -115,7 +115,7 @@ def walk(Array):  #To flatten the lists of lists of lists...
 ######################## Main code ########################################
 """
 
-#Define static variables
+#Define input variables
 IN_FILE = sys.argv[1]
 DEMONYMS_FILE_PATH = sys.argv[2]
 #Demonyms from https://github.com/knowitall/chunkedextractor/blob/master/src/main/resources/edu/knowitall/chunkedextractor/demonyms.csv
