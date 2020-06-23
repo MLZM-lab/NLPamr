@@ -124,6 +124,7 @@ OUTPUTS_PREFIX = sys.argv[3]
 
 #Read input file
 df = pd.read_pickle(IN_FILE)
+df.dropna(inplace=True)
 
 
 """
