@@ -187,6 +187,9 @@ pickle.dump( df, open("FULLcolumns_ALLBatches_noNaNAbstractsSingleStr.p", "wb") 
 txt = [lemmatize(doc, nlp) for doc in df.listOfDf_TokenizedSentenceNoStopWords]
 df = extend_df(df, txt, 'Lemmatized')
 
+##Save it
+pickle.dump( df, open("ALLBatches_noNaN_joinedTitleAbstract_Lemma.p", "wb") )
+
 
 #Stem
 txt = [stemming(doc, stemmer) for doc in df.Lemmatized]   #See that the stemming is done upon the lemmatized tokens
